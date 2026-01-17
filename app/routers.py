@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List
-
+from datetime import date
 from .database import get_db
 from . import models, schemas, auth
 from .auth import get_current_user
@@ -209,3 +209,86 @@ def delete_habit(
 
     db.delete(habit)
     db.commit()
+
+@router.post("/habits/{habit_id}/complete", status_code=status.HTTP_201_CREATED)
+def complete_habit(
+    habit_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # 1️⃣ Check habit exists
+    habit = db.query(models.Habit).filter(
+        models.Habit.id == habit_id
+    ).first()
+
+    if habit is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Habit not found",
+        )
+
+    # 2️⃣ Authorization check (ownership)
+    if habit.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to complete this habit",
+        )
+
+    today = date.today()
+
+    # 3️⃣ Prevent duplicate completion
+    existing_log = db.query(models.HabitLog).filter(
+        models.HabitLog.habit_id == habit_id,
+        models.HabitLog.user_id == current_user.id,
+        models.HabitLog.date == today,
+    ).first()
+
+    if existing_log:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Habit already completed today",
+        )
+
+    # 4️⃣ Create log
+    habit_log = models.HabitLog(
+        habit_id=habit_id,
+        user_id=current_user.id,
+        date=today,
+        completed=True,
+    )
+
+    db.add(habit_log)
+    db.commit()
+    db.refresh(habit_log)
+
+    return {"message": "Habit marked as completed for today"}
+
+@router.get("/habits/today/status", response_model=list[schemas.HabitToday])
+def get_today_habits(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    today = date.today()
+
+    # 1️⃣ Get all habits of user
+    habits = db.query(models.Habit).filter(
+        models.Habit.user_id == current_user.id
+    ).all()
+
+    result = []
+
+    for habit in habits:
+        # 2️⃣ Check if completed today
+        log = db.query(models.HabitLog).filter(
+            models.HabitLog.habit_id == habit.id,
+            models.HabitLog.user_id == current_user.id,
+            models.HabitLog.date == today,
+        ).first()
+
+        result.append({
+            "id": habit.id,
+            "name": habit.name,
+            "completed": log is not None
+        })
+
+    return result

@@ -29,3 +29,18 @@ class HabitOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class HabitToday(BaseModel):
+    id: int
+    name: str
+    completed: bool
+    class config :
+        orm_mode=True
+
+class HabitLogResponse(BaseModel):
+    id: int
+    habit_id: int
+    date: datetime
+
+    class Config:
+        orm_mode = True
