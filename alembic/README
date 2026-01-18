@@ -1,1 +1,21 @@
 Generic single-database configuration.
+# Habit Tracker API
+
+A FastAPI-based habit tracking backend with authentication, authorization, 
+daily habit completion, and progress tracking.
+
+## Features
+- JWT Authentication
+- User-specific habit management
+- Daily habit completion
+- Today’s habit status API
+
+## Tech Stack
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- Alembic
+- JWT Auth
+
+## Run locally
+uvicorn app.main:app --reload
